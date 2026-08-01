@@ -7,33 +7,19 @@ import { executeRequest, formatInput } from '@chatgpt-telegram-workers/plugins';
 import { MessageSender } from '../sender';
 import { loadChatRoleWithContext } from './auth';
 import {
-    ClearEnvCommandHandler,
-    DelEnvCommandHandler,
     EchoCommandHandler,
+    AskCommandHandler,
     HelpCommandHandler,
-    ImgCommandHandler,
-    ModelsCommandHandler,
-    NewCommandHandler,
-    RedoCommandHandler,
-    SetEnvCommandHandler,
-    SetEnvsCommandHandler,
+    ModelCommandHandler,
+    ResetCommandHandler,
     StartCommandHandler,
-    SystemCommandHandler,
-    VersionCommandHandler,
 } from './system';
 
 const SYSTEM_COMMANDS: CommandHandler[] = [
     new StartCommandHandler(),
-    new NewCommandHandler(),
-    new RedoCommandHandler(),
-    new ImgCommandHandler(),
-    new SetEnvCommandHandler(),
-    new SetEnvsCommandHandler(),
-    new DelEnvCommandHandler(),
-    new ClearEnvCommandHandler(),
-    new VersionCommandHandler(),
-    new SystemCommandHandler(),
-    new ModelsCommandHandler(),
+    new ResetCommandHandler(),
+    new AskCommandHandler(),
+    new ModelCommandHandler(),
     new HelpCommandHandler(),
 ];
 

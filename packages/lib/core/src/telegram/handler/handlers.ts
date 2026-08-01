@@ -141,7 +141,9 @@ export class OldMessageFilter implements MessageHandler {
             if (idList.length > 100) {
                 idList.shift();
             }
-            await ENV.DATABASE.put(context.SHARE_CONTEXT.lastMessageKey, JSON.stringify(idList));
+            await ENV.DATABASE.put(context.SHARE_CONTEXT.lastMessageKey, JSON.stringify(idList), {
+                expirationTtl: ENV.SESSION_TTL_SECONDS,
+            });
         }
         return null;
     };

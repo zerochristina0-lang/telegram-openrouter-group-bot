@@ -9,6 +9,29 @@ function tokensCounter(): (text: string) => number {
     };
 }
 
+function trimHistory(list: HistoryItem[], initLength: number, maxLength: number, maxToken: number): HistoryItem[] {
+    if (maxLength >= 0 && list.length > maxLength) {
+        list = list.slice(list.length - maxLength);
+    }
+    if (maxToken > 0) {
+        const counter = tokensCounter();
+        let tokenLength = initLength;
+        for (let i = list.length - 1; i >= 0; i--) {
+            const historyItem = list[i];
+            const length = historyItem.content ? counter(extractTextContent(historyItem)) : 0;
+            if (!historyItem.content) {
+                historyItem.content = '';
+            }
+            tokenLength += length;
+            if (tokenLength > maxToken) {
+                list = list.slice(i + 1);
+                break;
+            }
+        }
+    }
+    return list;
+}
+
 async function loadHistory(key: string): Promise<HistoryItem[]> {
     // 加载历史记录
     let history = [];
@@ -20,35 +43,6 @@ async function loadHistory(key: string): Promise<HistoryItem[]> {
     if (!history || !Array.isArray(history)) {
         history = [];
     }
-
-    const counter = tokensCounter();
-
-    const trimHistory = (list: HistoryItem[], initLength: number, maxLength: number, maxToken: number) => {
-    // 历史记录超出长度需要裁剪, 小于0不裁剪
-        if (maxLength >= 0 && list.length > maxLength) {
-            list = list.splice(list.length - maxLength);
-        }
-        // 处理token长度问题, 小于0不裁剪
-        if (maxToken > 0) {
-            let tokenLength = initLength;
-            for (let i = list.length - 1; i >= 0; i--) {
-                const historyItem = list[i];
-                let length = 0;
-                if (historyItem.content) {
-                    length = counter(extractTextContent(historyItem));
-                } else {
-                    historyItem.content = '';
-                }
-                // 如果最大长度超过maxToken,裁剪history
-                tokenLength += length;
-                if (tokenLength > maxToken) {
-                    list = list.splice(i + 1);
-                    break;
-                }
-            }
-        }
-        return list;
-    };
 
     // 裁剪
     if (ENV.AUTO_TRIM_HISTORY && ENV.MAX_HISTORY_LENGTH > 0) {
@@ -92,7 +86,15 @@ export async function requestCompletionsFromLLM(params: UserMessageItem | null, 
                 }
             }
         }
-        await ENV.DATABASE.put(historyKey, JSON.stringify([...history, editParams, ...responses])).catch(console.error);
+        const nextHistory = trimHistory(
+            [...history, editParams, ...responses],
+            0,
+            ENV.MAX_HISTORY_LENGTH,
+            ENV.MAX_TOKEN_LENGTH,
+        );
+        await ENV.DATABASE.put(historyKey, JSON.stringify(nextHistory), {
+            expirationTtl: ENV.SESSION_TTL_SECONDS,
+        }).catch(console.error);
     }
     return text;
 }

@@ -4,6 +4,8 @@ import type { MessageHandler } from './types';
 import { createTelegramBotAPI } from '../api';
 import { isGroupChat } from '../auth';
 
+const DIRECT_GROUP_COMMANDS = new Set(['/ask', '/reset', '/model']);
+
 function checkMention(content: string, entities: Telegram.MessageEntity[], botName: string, botId: number): {
     isMention: boolean;
     content: string;
@@ -67,9 +69,19 @@ export class GroupMention implements MessageHandler {
         let isMention = false;
         // 检查text中是否有机器人的提及
         if (message.text && message.entities) {
-            const res = checkMention(message.text, message.entities, botName, context.SHARE_CONTEXT.botId);
+            const originalText = message.text;
+            const res = checkMention(originalText, message.entities, botName, context.SHARE_CONTEXT.botId);
             isMention = res.isMention;
             message.text = res.content.trim();
+            if (!isMention) {
+                isMention = message.entities.some((entity) => {
+                    if (entity.type !== 'bot_command') {
+                        return false;
+                    }
+                    const command = originalText.slice(entity.offset, entity.offset + entity.length);
+                    return DIRECT_GROUP_COMMANDS.has(command);
+                });
+            }
         }
         // 检查caption中是否有机器人的提及
         if (message.caption && message.caption_entities) {

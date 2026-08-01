@@ -59,8 +59,9 @@ export class HelpCommandHandler implements CommandHandler {
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         let helpMsg = `${ENV.I18N.command.help.summary}\n`;
+        const availableCommands = new Set(['help', 'start', 'ask', 'reset', 'model']);
         for (const [k, v] of Object.entries(ENV.I18N.command.help)) {
-            if (k === 'summary') {
+            if (k === 'summary' || !availableCommands.has(k)) {
                 continue;
             }
             helpMsg += `/${k}：${v}\n`;
@@ -109,6 +110,30 @@ export class NewCommandHandler extends BaseNewCommandHandler implements CommandH
     scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         return BaseNewCommandHandler.handle(false, message, subcommand, context);
+    };
+}
+
+export class ResetCommandHandler extends BaseNewCommandHandler implements CommandHandler {
+    command = '/reset';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        await ENV.DATABASE.delete(context.SHARE_CONTEXT.lastMessageKey);
+        return BaseNewCommandHandler.handle(false, message, subcommand, context);
+    };
+}
+
+export class AskCommandHandler implements CommandHandler {
+    command = '/ask';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
+        if (!subcommand) {
+            return sender.sendPlainText('用法：/ask 你的问题');
+        }
+        return chatWithMessage(message, {
+            role: 'user',
+            content: subcommand,
+        }, context, null);
     };
 }
 
@@ -310,6 +335,26 @@ export class ModelsCommandHandler implements CommandHandler {
             },
         };
         return sender.sendRawMessage(params);
+    };
+}
+
+export class ModelCommandHandler implements CommandHandler {
+    command = '/model';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
+        const model = subcommand.trim();
+        const allowedModels = ENV.MODEL_ALLOW_LIST;
+        if (!model) {
+            const available = allowedModels.length > 0 ? `\n可切换模型：\n${allowedModels.join('\n')}` : '';
+            return sender.sendPlainText(`当前模型：${context.USER_CONFIG.OPENAI_CHAT_MODEL}${available}`);
+        }
+        if (!allowedModels.includes(model)) {
+            const available = allowedModels.length > 0 ? `\n可切换模型：\n${allowedModels.join('\n')}` : '';
+            return sender.sendPlainText(`不允许切换到该模型：${model}${available}`);
+        }
+        await context.execChangeAndSave({ OPENAI_CHAT_MODEL: model } as Record<AgentUserConfigKey, any>);
+        return sender.sendPlainText(`当前模型已切换为：${model}`);
     };
 }
 

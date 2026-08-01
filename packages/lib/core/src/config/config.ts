@@ -206,6 +206,8 @@ export class EnvironmentConfig {
     TELEGRAM_IMAGE_TRANSFER_MODE = 'base64';
     // 模型列表列数
     MODEL_LIST_COLUMNS = 1;
+    // 允许通过 /model 切换的模型，使用逗号分隔的环境变量配置
+    MODEL_ALLOW_LIST: string[] = [];
 
     // --  权限相关 --
     //
@@ -243,6 +245,8 @@ export class EnvironmentConfig {
     AUTO_TRIM_HISTORY = true;
     // 最大历史记录长度
     MAX_HISTORY_LENGTH = 20;
+    // 会话历史在 KV 中的保留时间（秒）；默认 12 小时
+    SESSION_TTL_SECONDS = 43200;
     // 最大消息长度
     MAX_TOKEN_LENGTH = -1;
     // Image占位符: 当此环境变量存在时，则历史记录中的图片将被替换为此占位符
