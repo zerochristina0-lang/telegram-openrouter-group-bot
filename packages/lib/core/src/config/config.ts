@@ -206,7 +206,8 @@ export class EnvironmentConfig {
     TELEGRAM_IMAGE_TRANSFER_MODE = 'base64';
     // 模型列表列数
     MODEL_LIST_COLUMNS = 1;
-    // 允许通过 /model 切换的模型，使用逗号分隔的环境变量配置
+    // 可选：通过 /model 额外允许的模型别名，使用逗号分隔的环境变量配置
+    // OpenRouter 的常规模型会从其模型目录动态读取，不受此项限制。
     MODEL_ALLOW_LIST: string[] = [];
 
     // --  权限相关 --

@@ -344,17 +344,57 @@ export class ModelCommandHandler implements CommandHandler {
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         const model = subcommand.trim();
-        const allowedModels = ENV.MODEL_ALLOW_LIST;
         if (!model) {
-            const available = allowedModels.length > 0 ? `\n可切换模型：\n${allowedModels.join('\n')}` : '';
-            return sender.sendPlainText(`当前模型：${context.USER_CONFIG.OPENAI_CHAT_MODEL}${available}`);
+            return sender.sendPlainText(
+                `当前模型：${context.USER_CONFIG.OPENAI_CHAT_MODEL}\n\n`
+                + '用法：\n'
+                + '/model <关键词>：搜索 OpenRouter 可用模型\n'
+                + '/model <精确模型 ID>：切换模型\n\n'
+                + '示例：/model gemini\n'
+                + '示例：/model google/gemini-2.5-flash',
+            );
         }
-        if (!allowedModels.includes(model)) {
-            const available = allowedModels.length > 0 ? `\n可切换模型：\n${allowedModels.join('\n')}` : '';
-            return sender.sendPlainText(`不允许切换到该模型：${model}${available}`);
+
+        const chatAgent = loadChatLLM(context.USER_CONFIG);
+        if (!chatAgent) {
+            return sender.sendPlainText('无法读取模型目录：未找到当前 AI Provider。');
         }
-        await context.execChangeAndSave({ OPENAI_CHAT_MODEL: model } as Record<AgentUserConfigKey, any>);
-        return sender.sendPlainText(`当前模型已切换为：${model}`);
+
+        try {
+            const remoteModels = await chatAgent.modelList(context.USER_CONFIG);
+            const models = [...new Set(remoteModels.filter(item => typeof item === 'string' && item.length > 0))]
+                .sort((a, b) => a.localeCompare(b));
+
+            // MODEL_ALLOW_LIST 只用于保留 OpenRouter latest 等别名的兼容性；
+            // 常规模型完全以 Provider 返回的动态目录为准。
+            if (models.includes(model) || ENV.MODEL_ALLOW_LIST.includes(model)) {
+                await context.execChangeAndSave({ OPENAI_CHAT_MODEL: model } as Record<AgentUserConfigKey, any>);
+                return sender.sendPlainText(`当前模型已切换为：${model}`);
+            }
+
+            const keyword = model.toLocaleLowerCase();
+            const matched = models.filter(item => item.toLocaleLowerCase().includes(keyword));
+            if (matched.length === 0) {
+                return sender.sendPlainText(
+                    `未找到模型：${model}\n\n`
+                    + '请用更短的关键词搜索，或从搜索结果中复制精确模型 ID 后再执行 /model。',
+                );
+            }
+
+            const visible = matched.slice(0, 12);
+            const suffix = matched.length > visible.length ? `\n\n还有 ${matched.length - visible.length} 个结果，请使用更具体的关键词。` : '';
+            return sender.sendPlainText(
+                `找到 ${matched.length} 个 OpenRouter 模型（展示前 ${visible.length} 个）：\n\n`
+                + visible.join('\n')
+                + `${suffix}\n\n复制精确模型 ID 后发送：\n/model <模型 ID>`,
+            );
+        } catch (e) {
+            console.error(e);
+            return sender.sendPlainText(
+                `读取 OpenRouter 模型目录失败：${(e as Error).message}\n\n`
+                + '请检查 OPENAI_API_BASE 和 OPENAI_API_KEY 是否仍为有效的 OpenRouter 配置。',
+            );
+        }
     };
 }
 
