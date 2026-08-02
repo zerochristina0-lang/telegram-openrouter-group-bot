@@ -14,6 +14,7 @@ import {
     ModelCommandHandler,
     ResetCommandHandler,
     StartCommandHandler,
+    ThinkCommandHandler,
 } from './system';
 
 const SYSTEM_COMMANDS: CommandHandler[] = [
@@ -22,6 +23,7 @@ const SYSTEM_COMMANDS: CommandHandler[] = [
     new AskCommandHandler(),
     new AskCleanCommandHandler(),
     new ModelCommandHandler(),
+    new ThinkCommandHandler(),
     new HelpCommandHandler(),
 ];
 

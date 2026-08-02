@@ -20,6 +20,10 @@ export class OpenAIConfig {
     OPENAI_API_BASE = 'https://api.openai.com/v1';
     // OpenAI API Extra Params
     OPENAI_API_EXTRA_PARAMS: Record<string, any> = {};
+    // OpenRouter / OpenAI-compatible reasoning effort. Empty means model default.
+    OPENAI_REASONING_EFFORT = '';
+    // OpenRouter GPT-5.6+ reasoning mode. Empty means standard mode.
+    OPENAI_REASONING_MODE = '';
     // OpenAI Chat Models List
     OPENAI_CHAT_MODELS_LIST = '';
 }

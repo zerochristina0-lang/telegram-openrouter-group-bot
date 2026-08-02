@@ -3,6 +3,7 @@ import type { AgentUserConfigKey, WorkerContext } from '#/config';
 import type * as Telegram from 'telegram-bot-api-types';
 import type { CommandHandler } from './types';
 import { loadChatLLM, loadImageGen } from '#/agent';
+import { isOpenRouterBase, isReasoningEffort, loadOpenRouterModelReasoning, REASONING_EFFORTS, supportsOpenRouterProMode } from '#/agent/reasoning';
 import { ConfigMerger, ENV } from '#/config';
 import { createTelegramBotAPI } from '../api';
 import { isGroupChat, TELEGRAM_AUTH_CHECKER } from '../auth';
@@ -59,7 +60,7 @@ export class HelpCommandHandler implements CommandHandler {
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         let helpMsg = `${ENV.I18N.command.help.summary}\n`;
-        const availableCommands = new Set(['help', 'start', 'ask', 'askclean', 'reset', 'model']);
+        const availableCommands = new Set(['help', 'start', 'ask', 'askclean', 'reset', 'model', 'think']);
         for (const [k, v] of Object.entries(ENV.I18N.command.help)) {
             if (k === 'summary' || !availableCommands.has(k)) {
                 continue;
@@ -383,8 +384,13 @@ export class ModelCommandHandler implements CommandHandler {
             // MODEL_ALLOW_LIST 只用于保留 OpenRouter latest 等别名的兼容性；
             // 常规模型完全以 Provider 返回的动态目录为准。
             if (models.includes(model) || ENV.MODEL_ALLOW_LIST.includes(model)) {
-                await context.execChangeAndSave({ OPENAI_CHAT_MODEL: model } as Record<AgentUserConfigKey, any>);
-                return sender.sendPlainText(`当前模型已切换为：${model}`);
+                await context.execChangeAndSave({
+                    OPENAI_CHAT_MODEL: model,
+                    // 不同模型支持的 reasoning 参数不同，切换模型后恢复为模型默认值。
+                    OPENAI_REASONING_EFFORT: '',
+                    OPENAI_REASONING_MODE: '',
+                } as Record<AgentUserConfigKey, any>);
+                return sender.sendPlainText(`当前模型已切换为：${model}\n思考设置已恢复为：自动（模型默认）`);
             }
 
             const keyword = model.toLocaleLowerCase();
@@ -409,6 +415,88 @@ export class ModelCommandHandler implements CommandHandler {
                 `读取 OpenRouter 模型目录失败：${(e as Error).message}\n\n`
                 + '请检查 OPENAI_API_BASE 和 OPENAI_API_KEY 是否仍为有效的 OpenRouter 配置。',
             );
+        }
+    };
+}
+
+function formatReasoningSetting(context: WorkerContext): string {
+    const effort = context.USER_CONFIG.OPENAI_REASONING_EFFORT || '自动（模型默认）';
+    const mode = context.USER_CONFIG.OPENAI_REASONING_MODE || 'standard';
+    return `当前模型：${context.USER_CONFIG.OPENAI_CHAT_MODEL}\n思考程度：${effort}\n推理模式：${mode}`;
+}
+
+export class ThinkCommandHandler implements CommandHandler {
+    command = '/think';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
+        const setting = subcommand.trim().toLowerCase();
+        if (!setting) {
+            return sender.sendPlainText(
+                `${formatReasoningSetting(context)}\n\n`
+                + '用法：\n'
+                + '/think auto：恢复模型默认值\n'
+                + `/think <程度>：${REASONING_EFFORTS.join('、')}\n`
+                + '/think pro：启用 GPT-5.6+ 的 Pro 推理模式\n'
+                + '/think standard：关闭 Pro 模式，保留当前思考程度\n\n'
+                + '切换 /model 后会自动恢复为模型默认值。',
+            );
+        }
+
+        if (!isOpenRouterBase(context.USER_CONFIG.OPENAI_API_BASE)) {
+            return sender.sendPlainText('当前 /think 仅适用于 OpenRouter 的 OpenAI 兼容接口。');
+        }
+
+        if (setting === 'auto') {
+            await context.execChangeAndSave({
+                OPENAI_REASONING_EFFORT: '',
+                OPENAI_REASONING_MODE: '',
+            } as Record<AgentUserConfigKey, any>);
+            return sender.sendPlainText(`${formatReasoningSetting(context)}\n\n已恢复为模型默认思考设置。`);
+        }
+
+        if (setting === 'standard') {
+            await context.execChangeAndSave({ OPENAI_REASONING_MODE: '' } as Record<AgentUserConfigKey, any>);
+            return sender.sendPlainText(`${formatReasoningSetting(context)}\n\n已关闭 Pro 推理模式。`);
+        }
+
+        if (setting === 'pro') {
+            if (!supportsOpenRouterProMode(context.USER_CONFIG.OPENAI_CHAT_MODEL)) {
+                return sender.sendPlainText('Pro 推理模式仅适用于 OpenRouter 上支持它的 OpenAI GPT-5.6 及更新模型。');
+            }
+            await context.execChangeAndSave({
+                OPENAI_REASONING_EFFORT: context.USER_CONFIG.OPENAI_REASONING_EFFORT === 'none' ? '' : context.USER_CONFIG.OPENAI_REASONING_EFFORT,
+                OPENAI_REASONING_MODE: 'pro',
+            } as Record<AgentUserConfigKey, any>);
+            return sender.sendPlainText(`${formatReasoningSetting(context)}\n\n已启用 Pro 推理模式。`);
+        }
+
+        if (!isReasoningEffort(setting)) {
+            return sender.sendPlainText(`不支持的思考程度：${subcommand}\n\n可选：auto、standard、pro、${REASONING_EFFORTS.join('、')}`);
+        }
+
+        try {
+            const capability = await loadOpenRouterModelReasoning(context.USER_CONFIG);
+            if (!capability) {
+                return sender.sendPlainText(`当前模型 ${context.USER_CONFIG.OPENAI_CHAT_MODEL} 未公开支持可调思考程度。`);
+            }
+            if (setting === 'none' && capability.mandatory) {
+                return sender.sendPlainText(`当前模型 ${context.USER_CONFIG.OPENAI_CHAT_MODEL} 必须使用推理，不能设置为 none。`);
+            }
+            if (capability.supportedEfforts && !capability.supportedEfforts.includes(setting)) {
+                return sender.sendPlainText(
+                    `当前模型不支持 ${setting}。\n可选程度：${capability.supportedEfforts.join('、') || '无'}。`,
+                );
+            }
+            await context.execChangeAndSave({
+                OPENAI_REASONING_EFFORT: setting,
+                OPENAI_REASONING_MODE: setting === 'none' ? '' : context.USER_CONFIG.OPENAI_REASONING_MODE,
+            } as Record<AgentUserConfigKey, any>);
+            return sender.sendPlainText(`${formatReasoningSetting(context)}\n\n已保存为当前群的思考设置。`);
+        } catch (e) {
+            console.error(e);
+            return sender.sendPlainText(`无法读取 OpenRouter 模型能力：${(e as Error).message}`);
         }
     };
 }

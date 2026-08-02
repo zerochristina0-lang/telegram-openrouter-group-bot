@@ -100,6 +100,8 @@ All `xxx_MODELS_LIST` can be a URL or a JSON array string. When it is empty, it 
 | OPENAI_CHAT_MODEL       | OpenAI Model            | `gpt-4o-mini`               |
 | OPENAI_API_BASE         | OpenAI API BASE         | `https://api.openai.com/v1` |
 | OPENAI_API_EXTRA_PARAMS | OpenAI API Extra Params | `{}`                        |
+| OPENAI_REASONING_EFFORT | OpenRouter reasoning effort (overridable per chat with `/think`) | `''` (model default) |
+| OPENAI_REASONING_MODE   | OpenRouter GPT-5.6+ reasoning mode (overridable with `/think pro`) | `''` (standard) |
 | OPENAI_CHAT_MODELS_LIST | List of OpenAI Models   | `''`                        |
 
 ### Dall-e

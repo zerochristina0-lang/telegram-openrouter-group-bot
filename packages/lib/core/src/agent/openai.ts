@@ -12,6 +12,7 @@ import type {
     LLMChatParams,
 } from './types';
 import { ImageSupportFormat, loadOpenAIModelList, renderOpenAIMessages } from '#/agent/openai_compatibility';
+import { buildOpenRouterReasoning } from '#/agent/reasoning';
 import { requestChatCompletions } from './request';
 import { bearerHeader, convertStringToResponseMessages, getAgentUserConfigFieldName, loadModelsList } from './utils';
 
@@ -32,8 +33,15 @@ export class OpenAI implements ChatAgent {
         const { prompt, messages } = params;
         const url = `${context.OPENAI_API_BASE}/chat/completions`;
         const header = bearerHeader(openAIApiKey(context));
+        const extraParams = context.OPENAI_API_EXTRA_PARAMS || {};
+        const reasoning = buildOpenRouterReasoning(
+            extraParams,
+            context.OPENAI_REASONING_EFFORT,
+            context.OPENAI_REASONING_MODE,
+        );
         const body = {
-            ...(context.OPENAI_API_EXTRA_PARAMS || {}),
+            ...extraParams,
+            ...(reasoning ? { reasoning } : {}),
             model: context.OPENAI_CHAT_MODEL,
             messages: await renderOpenAIMessages(prompt, messages, [ImageSupportFormat.URL, ImageSupportFormat.BASE64]),
             stream: onStream != null,

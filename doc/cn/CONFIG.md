@@ -100,6 +100,8 @@ OPENAI_API_BASE,GOOGLE_COMPLETIONS_API,MISTRAL_API_BASE,COHERE_API_BASE,ANTHROPI
 | OPENAI_CHAT_MODEL       | OpenAI的模型名称             | `gpt-4o-mini`               |
 | OPENAI_API_BASE         | OpenAI API BASE         | `https://api.openai.com/v1` |
 | OPENAI_API_EXTRA_PARAMS | OpenAI API Extra Params | `{}`                        |
+| OPENAI_REASONING_EFFORT | OpenRouter 思考程度（可由 `/think` 按群覆盖） | `''`（模型默认） |
+| OPENAI_REASONING_MODE   | OpenRouter GPT-5.6+ 推理模式（可由 `/think pro` 按群覆盖） | `''`（standard） |
 | OPENAI_CHAT_MODELS_LIST | OpenAI 模型列表             | `''`                        |
 
 ### Dall-e

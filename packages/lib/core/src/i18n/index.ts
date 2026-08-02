@@ -37,24 +37,29 @@ export interface I18n {
     };
 }
 
+function withThinkCommand(i18n: I18n, description: string): I18n {
+    i18n.command.help.think = description;
+    return i18n;
+}
+
 export function loadI18n(lang?: string): I18n {
     switch (lang?.toLowerCase()) {
         case 'cn':
         case 'zh-cn':
         case 'zh-hans':
-            return zhHans;
+            return withThinkCommand(zhHans, '查看或设置思考程度');
         case 'zh-tw':
         case 'zh-hk':
         case 'zh-mo':
         case 'zh-hant':
-            return zhHant;
+            return withThinkCommand(zhHant, '檢視或設定思考程度');
         case 'pt':
         case 'pt-br':
-            return pt;
+            return withThinkCommand(pt, 'Ver ou definir o nível de raciocínio');
         case 'en':
         case 'en-us':
-            return en;
+            return withThinkCommand(en, 'View or set reasoning effort');
         default:
-            return en;
+            return withThinkCommand(en, 'View or set reasoning effort');
     }
 }

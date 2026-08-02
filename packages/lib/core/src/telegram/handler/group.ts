@@ -6,7 +6,7 @@ import type { MessageHandler } from './types';
 import { createTelegramBotAPI } from '../api';
 import { isGroupChat } from '../auth';
 
-const DIRECT_GROUP_COMMANDS = new Set(['/ask', '/askclean', '/reset', '/model', '/help', '/start']);
+const DIRECT_GROUP_COMMANDS = new Set(['/ask', '/askclean', '/reset', '/model', '/think', '/help', '/start']);
 
 function entitiesContainCommand(entities: Telegram.MessageEntity[] | undefined): boolean {
     return entities?.some(entity => entity.type === 'bot_command') ?? false;
