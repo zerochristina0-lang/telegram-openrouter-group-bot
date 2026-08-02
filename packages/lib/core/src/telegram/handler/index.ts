@@ -26,10 +26,10 @@ const SHARE_HANDLER: UpdateHandler[] = [
     new Update2MessageHandler([
         // 过滤不支持的消息(抛出异常结束消息处理)
         new MessageFilter(),
+        // 先去重，避免 Telegram 重试时重复写入群聊上下文或再次调用模型
+        new OldMessageFilter(),
         // 处理群消息，判断是否需要响应此条消息
         new GroupMention(),
-        // 忽略旧消息
-        new OldMessageFilter(),
         // DEBUG: 保存最后一条消息,按照需求自行调整此中间件位置
         new SaveLastMessage(),
         // 处理命令消息

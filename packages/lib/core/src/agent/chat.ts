@@ -52,6 +52,29 @@ async function loadHistory(key: string): Promise<HistoryItem[]> {
     return history;
 }
 
+async function saveHistory(key: string, history: HistoryItem[]): Promise<void> {
+    const nextHistory = trimHistory(
+        history,
+        0,
+        ENV.MAX_HISTORY_LENGTH,
+        ENV.MAX_TOKEN_LENGTH,
+    );
+    await ENV.DATABASE.put(key, JSON.stringify(nextHistory), {
+        expirationTtl: ENV.SESSION_TTL_SECONDS,
+    }).catch(console.error);
+}
+
+// 将不触发模型调用的消息写入同一份会话历史。
+// 这使群聊中的普通发言能在下一次 @机器人、回复机器人或 /ask 时作为上下文提供给模型。
+export async function appendHistoryItems(key: string, items: HistoryItem[]): Promise<void> {
+    const historyDisable = ENV.AUTO_TRIM_HISTORY && ENV.MAX_HISTORY_LENGTH <= 0;
+    if (historyDisable || items.length === 0) {
+        return;
+    }
+    const history = await loadHistory(key);
+    await saveHistory(key, [...history, ...items]);
+}
+
 export type StreamResultHandler = (text: string) => Promise<any>;
 
 export async function requestCompletionsFromLLM(params: UserMessageItem | null, context: WorkerContext, agent: ChatAgent, modifier: HistoryModifier | null, onStream: StreamResultHandler | null): Promise<string> {
@@ -86,15 +109,7 @@ export async function requestCompletionsFromLLM(params: UserMessageItem | null, 
                 }
             }
         }
-        const nextHistory = trimHistory(
-            [...history, editParams, ...responses],
-            0,
-            ENV.MAX_HISTORY_LENGTH,
-            ENV.MAX_TOKEN_LENGTH,
-        );
-        await ENV.DATABASE.put(historyKey, JSON.stringify(nextHistory), {
-            expirationTtl: ENV.SESSION_TTL_SECONDS,
-        }).catch(console.error);
+        await saveHistory(historyKey, [...history, editParams, ...responses]);
     }
     return text;
 }

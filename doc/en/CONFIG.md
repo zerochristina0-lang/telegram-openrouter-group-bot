@@ -35,7 +35,7 @@ The configuration that is common to each user can only be configured and filled 
 | TELEGRAM_BOT_NAME         | Telegram bot name              | `''`(array string)                         | The Bot Name corresponding to the Telegram Token that is allowed to access, separated by commas when setting. |
 | CHAT_GROUP_WHITE_LIST     | Group whitelist                | `''`(array string)                         | Allowed group ID whitelist.                                                                                   |
 | GROUP_CHAT_BOT_ENABLE     | Whether to enable group bots.  | `true`                                     | Whether to enable group robots.                                                                               |
-| GROUP_CHAT_BOT_SHARE_MODE | Group robot sharing mode       | `true`                                     | After opening, people in the same group use the same chat context.                                            |
+| GROUP_CHAT_BOT_SHARE_MODE | Group robot sharing mode       | `true`                                     | People in the same group use one chat context; ordinary text messages are recorded silently without calling AI. |
 
 > IMPORTANT: You must add the group ID to the whitelist `CHAT_GROUP_WHITE_LIST` to use it, otherwise anyone can add your bot to the group and consume your quota.
 
@@ -61,7 +61,8 @@ OPENAI_API_BASE,GOOGLE_COMPLETIONS_API,MISTRAL_API_BASE,COHERE_API_BASE,ANTHROPI
 | KEY                | Name                                  | Default      | Description                                                                        |
 |--------------------|---------------------------------------|--------------|------------------------------------------------------------------------------------|
 | AUTO_TRIM_HISTORY  | Automatic trimming of message history | `true`       | Automatically trim messages to avoid the 4096 character limit                      |
-| MAX_HISTORY_LENGTH | Maximum length of message history     | `20`         | Maximum number of message history entries to keep                                  |
+| MAX_HISTORY_LENGTH | Maximum length of message history     | `16`         | Maximum entries to keep, including ordinary group messages, prompts, and bot replies |
+| SESSION_TTL_SECONDS | Session TTL in seconds               | `43200`     | Kept for 12 hours after each write                                                  |
 | MAX_TOKEN_LENGTH   | Maximum token length                  | `-1` (uncut) | At the current model price, it only requires trimming the number of message items. |
 
 ### Feature configuration

@@ -245,7 +245,7 @@ export class EnvironmentConfig {
     // 为了避免4096字符限制，将消息删减
     AUTO_TRIM_HISTORY = true;
     // 最大历史记录长度
-    MAX_HISTORY_LENGTH = 20;
+    MAX_HISTORY_LENGTH = 16;
     // 会话历史在 KV 中的保留时间（秒）；默认 12 小时
     SESSION_TTL_SECONDS = 43200;
     // 最大消息长度

@@ -35,7 +35,7 @@
 | TELEGRAM_BOT_NAME         | Telegram机器人名称  | `''`(array string)          | 允许访问的Telegram Token对应的Bot Name，设置时以逗号分隔 |
 | CHAT_GROUP_WHITE_LIST     | 群组白名单          | `''`(array string)          | 允许使用的群组ID白名单                            |
 | GROUP_CHAT_BOT_ENABLE     | 群组机器人开关        | `true`                      | 是否启用群组机器人                               |
-| GROUP_CHAT_BOT_SHARE_MODE | 群组机器人共享模式      | `true`                      | 开启后同个群组的人使用同一个聊天上下文                     |
+| GROUP_CHAT_BOT_SHARE_MODE | 群组机器人共享模式      | `true`                      | 开启后同个群组的人使用同一个聊天上下文；普通文本会静默写入该上下文，不调用 AI |
 
 > IMPORTANT: 必须把群ID加到白名单`CHAT_GROUP_WHITE_LIST`才能使用, 否则任何人都可以把你的机器人加到群组中，然后消耗你的配额。
 
@@ -61,7 +61,8 @@ OPENAI_API_BASE,GOOGLE_COMPLETIONS_API,MISTRAL_API_BASE,COHERE_API_BASE,ANTHROPI
 | KEY                | 名称       | 默认值       | 描述                  |
 |--------------------|----------|-----------|---------------------|
 | AUTO_TRIM_HISTORY  | 自动裁剪历史记录 | `true`    | 为避免4096字符限制，自动裁剪消息  |
-| MAX_HISTORY_LENGTH | 最大历史记录长度 | `20`      | 保留的最大历史记录条数         |
+| MAX_HISTORY_LENGTH | 最大历史记录长度 | `16`      | 保留的最大历史记录条数（包含普通群聊、提问和机器人回复） |
+| SESSION_TTL_SECONDS | 会话过期时间（秒） | `43200` | 每次写入后保留 12 小时 |
 | MAX_TOKEN_LENGTH   | 最大令牌长度   | `-1`（不裁剪） | 以现在模型的价格只需要裁剪消息条数即可 |
 
 ### 特性开关

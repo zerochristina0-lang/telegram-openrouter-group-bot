@@ -135,7 +135,8 @@ export class OldMessageFilter implements MessageHandler {
         }
         // 保存最近的100条消息，如果存在则忽略，如果不存在则保存
         if (idList.includes(message.message_id)) {
-            throw new Error('Ignore old message');
+            // 使用成功状态确认重复 webhook，避免 Telegram 因 5xx 持续重试。
+            return new Response(null, { status: 204 });
         } else {
             idList.push(message.message_id);
             if (idList.length > 100) {
