@@ -4,7 +4,7 @@ import type { MessageHandler } from './types';
 import { createTelegramBotAPI } from '../api';
 import { isGroupChat } from '../auth';
 
-const DIRECT_GROUP_COMMANDS = new Set(['/ask', '/reset', '/model']);
+const DIRECT_GROUP_COMMANDS = new Set(['/ask', '/askclean', '/reset', '/model']);
 
 function checkMention(content: string, entities: Telegram.MessageEntity[], botName: string, botId: number): {
     isMention: boolean;

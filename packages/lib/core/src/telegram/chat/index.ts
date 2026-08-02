@@ -6,7 +6,9 @@ import { ENV } from '#/config';
 import { createTelegramBotAPI } from '../api';
 import { MessageSender } from '../sender';
 
-export async function chatWithMessage(message: Telegram.Message, params: UserMessageItem | null, context: WorkerContext, modifier: HistoryModifier | null): Promise<Response> {
+type ChatRequest = (agent: NonNullable<ReturnType<typeof loadChatLLM>>, onStream: StreamResultHandler | null) => Promise<string>;
+
+async function sendChatRequest(message: Telegram.Message, context: WorkerContext, request: ChatRequest): Promise<Response> {
     const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
     try {
         try {
@@ -58,7 +60,7 @@ export async function chatWithMessage(message: Telegram.Message, params: UserMes
         if (agent === null) {
             return sender.sendPlainText('LLM is not enable');
         }
-        const answer = await requestCompletionsFromLLM(params, context, agent, modifier, onStream);
+        const answer = await request(agent, onStream);
         if (nextEnableTime !== null && nextEnableTime > Date.now()) {
             await new Promise(resolve => setTimeout(resolve, (nextEnableTime ?? 0) - Date.now()));
         }
@@ -71,6 +73,27 @@ export async function chatWithMessage(message: Telegram.Message, params: UserMes
         }
         return sender.sendPlainText(errMsg);
     }
+}
+
+export async function chatWithMessage(message: Telegram.Message, params: UserMessageItem | null, context: WorkerContext, modifier: HistoryModifier | null): Promise<Response> {
+    return sendChatRequest(
+        message,
+        context,
+        (agent, onStream) => requestCompletionsFromLLM(params, context, agent, modifier, onStream),
+    );
+}
+
+// 对照模式：使用当前模型和 Provider 参数，但不附加系统提示词或会话历史。
+// 不写入 KV，避免测试请求影响正常群聊会话。
+export async function chatWithCleanMessage(message: Telegram.Message, params: UserMessageItem, context: WorkerContext): Promise<Response> {
+    return sendChatRequest(
+        message,
+        context,
+        async (agent, onStream) => {
+            const { text } = await agent.request({ messages: [params] }, context.USER_CONFIG, onStream);
+            return text;
+        },
+    );
 }
 
 export async function extractImageURL(fileId: string | null, context: WorkerContext): Promise<URL | null> {

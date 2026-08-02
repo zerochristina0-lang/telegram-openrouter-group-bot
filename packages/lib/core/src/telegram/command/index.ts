@@ -9,6 +9,7 @@ import { loadChatRoleWithContext } from './auth';
 import {
     EchoCommandHandler,
     AskCommandHandler,
+    AskCleanCommandHandler,
     HelpCommandHandler,
     ModelCommandHandler,
     ResetCommandHandler,
@@ -19,6 +20,7 @@ const SYSTEM_COMMANDS: CommandHandler[] = [
     new StartCommandHandler(),
     new ResetCommandHandler(),
     new AskCommandHandler(),
+    new AskCleanCommandHandler(),
     new ModelCommandHandler(),
     new HelpCommandHandler(),
 ];

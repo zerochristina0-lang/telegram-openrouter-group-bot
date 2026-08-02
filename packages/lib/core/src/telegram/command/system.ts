@@ -6,7 +6,7 @@ import { loadChatLLM, loadImageGen } from '#/agent';
 import { ConfigMerger, ENV } from '#/config';
 import { createTelegramBotAPI } from '../api';
 import { isGroupChat, TELEGRAM_AUTH_CHECKER } from '../auth';
-import { chatWithMessage } from '../chat';
+import { chatWithCleanMessage, chatWithMessage } from '../chat';
 import { MessageSender } from '../sender';
 
 export class ImgCommandHandler implements CommandHandler {
@@ -59,7 +59,7 @@ export class HelpCommandHandler implements CommandHandler {
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         let helpMsg = `${ENV.I18N.command.help.summary}\n`;
-        const availableCommands = new Set(['help', 'start', 'ask', 'reset', 'model']);
+        const availableCommands = new Set(['help', 'start', 'ask', 'askclean', 'reset', 'model']);
         for (const [k, v] of Object.entries(ENV.I18N.command.help)) {
             if (k === 'summary' || !availableCommands.has(k)) {
                 continue;
@@ -134,6 +134,21 @@ export class AskCommandHandler implements CommandHandler {
             role: 'user',
             content: subcommand,
         }, context, null);
+    };
+}
+
+export class AskCleanCommandHandler implements CommandHandler {
+    command = '/askclean';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
+        if (!subcommand) {
+            return sender.sendPlainText('用法：/askclean 你的问题\n\n对照模式不会附加系统提示词或会话历史，也不会写入 Session。');
+        }
+        return chatWithCleanMessage(message, {
+            role: 'user',
+            content: subcommand,
+        }, context);
     };
 }
 
