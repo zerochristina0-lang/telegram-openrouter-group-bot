@@ -1,6 +1,7 @@
 import type * as Telegram from 'telegram-bot-api-types';
 import type { UpdateHandler } from './types';
 import { WorkerContext } from '#/config';
+import { PendingAskInputHandler } from '../ask_input';
 import { GroupMention } from './group';
 import {
     CallbackQueryHandler,
@@ -28,6 +29,9 @@ const SHARE_HANDLER: UpdateHandler[] = [
         new MessageFilter(),
         // 先去重，避免 Telegram 重试时重复写入群聊上下文或再次调用模型
         new OldMessageFilter(),
+        // 单独 /ask 后，接住同一用户的下一条文字问题。
+        // 必须早于 GroupMention，避免它被当成普通群聊记录静默处理。
+        new PendingAskInputHandler(),
         // 处理群消息，判断是否需要响应此条消息
         new GroupMention(),
         // DEBUG: 保存最后一条消息,按照需求自行调整此中间件位置

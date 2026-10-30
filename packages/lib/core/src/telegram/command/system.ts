@@ -6,6 +6,7 @@ import { loadChatLLM, loadImageGen } from '#/agent';
 import { isOpenRouterBase, isReasoningEffort, loadOpenRouterModelReasoning, REASONING_EFFORTS, supportsOpenRouterProMode } from '#/agent/reasoning';
 import { ConfigMerger, ENV } from '#/config';
 import { createTelegramBotAPI } from '../api';
+import { beginPendingAskInput, clearPendingAskInput } from '../ask_input';
 import { isGroupChat, TELEGRAM_AUTH_CHECKER } from '../auth';
 import { chatWithCleanMessage, chatWithMessage } from '../chat';
 import { MessageSender } from '../sender';
@@ -56,33 +57,59 @@ export class ImgCommandHandler implements CommandHandler {
 
 export class HelpCommandHandler implements CommandHandler {
     command = '/help';
-    scopes = ['all_private_chats', 'all_chat_administrators'];
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
-        let helpMsg = `${ENV.I18N.command.help.summary}\n`;
-        const availableCommands = new Set(['help', 'start', 'ask', 'askclean', 'reset', 'model', 'think']);
-        for (const [k, v] of Object.entries(ENV.I18N.command.help)) {
-            if (k === 'summary' || !availableCommands.has(k)) {
-                continue;
-            }
-            helpMsg += `/${k}：${v}\n`;
+        const projectCommands = ['ask', 'askclean', 'model', 'think', 'reset', 'cancel', 'help', 'start'];
+        const customCommands = Object.entries(ENV.CUSTOM_COMMAND);
+        const pluginCommands = Object.entries(ENV.PLUGINS_COMMAND);
+        const total = projectCommands.length + customCommands.length + pluginCommands.length;
+        let helpMsg = `${commandHelpTitle(total)}\n\n`;
+        for (const command of projectCommands) {
+            helpMsg += `/${command}：${ENV.I18N.command.help[command] || command}\n`;
         }
-        for (const [k, v] of Object.entries(ENV.CUSTOM_COMMAND)) {
-            if (v.description) {
-                helpMsg += `${k}：${v.description}\n`;
-            }
+        for (const [command, config] of customCommands) {
+            helpMsg += `${command}：${config.description || '自定义命令'}\n`;
         }
-        for (const [k, v] of Object.entries(ENV.PLUGINS_COMMAND)) {
-            if (v.description) {
-                helpMsg += `${k}：${v.description}\n`;
-            }
+        for (const [command, config] of pluginCommands) {
+            helpMsg += `${command}：${config.description || '插件命令'}\n`;
         }
+        helpMsg += commandHelpTip();
         return sender.sendPlainText(helpMsg);
     };
 }
 
+function commandHelpTitle(total: number): string {
+    const language = ENV.LANGUAGE.toLowerCase();
+    if (language.startsWith('pt')) {
+        return `Comandos disponíveis neste chat (${total})：`;
+    }
+    if (language === 'zh-tw' || language === 'zh-hk' || language === 'zh-mo' || language === 'zh-hant') {
+        return `目前群組可用指令（${total} 條）：`;
+    }
+    if (language === 'zh-cn' || language === 'zh-hans' || language === 'cn') {
+        return `当前群可用命令（${total} 条）：`;
+    }
+    return `Available commands in this chat (${total}):`;
+}
+
+function commandHelpTip(): string {
+    const language = ENV.LANGUAGE.toLowerCase();
+    if (language.startsWith('pt')) {
+        return '\nDica: envie /ask sozinho, depois envie sua pergunta. Use /cancel para cancelar.';
+    }
+    if (language === 'zh-tw' || language === 'zh-hk' || language === 'zh-mo' || language === 'zh-hant') {
+        return '\n提示：單獨發送 /ask 後，再發送問題即可；/cancel 可取消等待。';
+    }
+    if (language === 'zh-cn' || language === 'zh-hans' || language === 'cn') {
+        return '\n提示：单独发送 /ask 后，再发送问题即可；/cancel 可取消等待。';
+    }
+    return '\nTip: send /ask by itself, then send your question. Use /cancel to cancel.';
+}
+
 class BaseNewCommandHandler {
     static async handle(showID: boolean, message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> {
+        await clearPendingAskInput(context);
         await ENV.DATABASE.delete(context.SHARE_CONTEXT.chatHistoryKey);
         const text = ENV.I18N.command.new.new_chat_start + (showID ? `(${message.chat.id})` : '');
         const params: Telegram.SendMessageParams = {
@@ -127,10 +154,10 @@ export class AskCommandHandler implements CommandHandler {
     command = '/ask';
     scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
-        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         if (!subcommand) {
-            return sender.sendPlainText('用法：/ask 你的问题');
+            return beginPendingAskInput(message, context, 'normal');
         }
+        await clearPendingAskInput(context);
         return chatWithMessage(message, {
             role: 'user',
             content: subcommand,
@@ -142,10 +169,10 @@ export class AskCleanCommandHandler implements CommandHandler {
     command = '/askclean';
     scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
-        const sender = MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message);
         if (!subcommand) {
-            return sender.sendPlainText('用法：/askclean 你的问题\n\n对照模式不会附加系统提示词或会话历史，也不会写入 Session。');
+            return beginPendingAskInput(message, context, 'clean');
         }
+        await clearPendingAskInput(context);
         return chatWithCleanMessage(message, {
             role: 'user',
             content: subcommand,
@@ -155,8 +182,18 @@ export class AskCleanCommandHandler implements CommandHandler {
 
 export class StartCommandHandler extends BaseNewCommandHandler implements CommandHandler {
     command = '/start';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
     handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
         return BaseNewCommandHandler.handle(true, message, subcommand, context);
+    };
+}
+
+export class CancelCommandHandler implements CommandHandler {
+    command = '/cancel';
+    scopes = ['all_private_chats', 'all_group_chats', 'all_chat_administrators'];
+    handle = async (message: Telegram.Message, subcommand: string, context: WorkerContext): Promise<Response> => {
+        await clearPendingAskInput(context);
+        return MessageSender.fromMessage(context.SHARE_CONTEXT.botToken, message).sendPlainText('已取消等待输入。');
     };
 }
 
